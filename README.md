@@ -82,3 +82,22 @@ bench/                synthetic universe with ground truth, vendor mocks, advers
 - **Single tenant per deployment.** Isolate tenants by running separate databases and processes.
 - **Father/son pairs with identical names, a shared landline, and no DOB or suffix anywhere in their records** can still merge. The benchmark measures this (see GATES.md). No rule can separate records that carry no distinguishing evidence.
 - **Consent correctness is bounded by recall.** An opt-out on a record that the engine cannot link to the person (no shared identifier and no gray-zone pair) cannot reach that person's profile. The pre-registered consent gate fails for this reason. See GATES.md.
+
+## Latest benchmark results — r15
+
+**Run date:** 2026-09-29. **Environment:** Windows, Python 3.12, SQLite; synthetic customer data and vendor HTTP mocks. The registered precision target is 0.995 and recall gate is 0.90.
+
+| Workload | Source records | Pair precision | Pair recall | Recall change vs r12 | F1 | Review load | Runtime | Safety gates |
+|---|---:|---:|---:|---:|---:|---:|---:|---|
+| 1,500 people, seed 7 | 3,699 | 0.99884 | 0.92988 | +0.19 pp | 0.96313 | 3.731% | 41.8 s | 17/17 pass |
+| 1,500 people, seed 21 | 3,693 | 0.99970 | 0.91619 | +0.49 pp | 0.95613 | 3.276% | 41.6 s | 17/17 pass |
+| 1,500 people, seed 42 | 3,685 | 0.99518 | 0.90744 | +0.71 pp | 0.94929 | 4.478% | 41.9 s | 17/17 pass |
+| 5,000 people, seed 7 | 12,219 | 0.99856 | 0.91533 | +0.65 pp | 0.95513 | 4.387% | 146.0 s | 17/17 pass |
+| 1,500 people, seed 84 holdout | 3,666 | 0.99540 | 0.91650 | +0.48 pp vs paired r12 | 0.95433 | 4.419% | 42.1 s | 17/17 pass |
+| 45 people, seed 7 smoke | 105 | 1.00000 | 0.92308 | 0.00 pp | 0.96000 | 6.667% | 2.2 s | G12 fails |
+
+Across the four fixed production runs, mean recall gain was **0.51 percentage points** versus r12. On the paired seed-84 holdout, true-positive pairs rose from **3,232 to 3,249** (+17); precision improved from **0.99172 to 0.99540**, and recall from **0.91171 to 0.91650**. The small smoke test clears precision and recall but fails G12 because seven reviews over 105 source records exceed the review-load limit.
+
+G3 distinguishable hard-negative merges were zero. G8 consent-violation rates were **0.164%** (seed 7), **0%** (seed 21), **0%** (seed 42), **0.062%** (5,000-person run), and **0.167%** (holdout); no pure denied profile was exported. The tightest precision result is seed 42 at **0.99518**, only **0.018 percentage points** above the target.
+
+These are synthetic benchmark results, not a guarantee for shifted customer data. Connector checks used documented-shape mocks rather than live vendor tenants; no external LLM was called. Indistinguishable Jr/Sr profiles can still merge when records omit suffix and DOB. See [BENCHMARK_REPORT.md](BENCHMARK_REPORT.md) for the full method, limits, and reproduction commands.
