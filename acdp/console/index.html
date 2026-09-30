@@ -1,0 +1,93 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Agentic CDP Console</title>
+<style>
+:root{--bg:#f6f7f9;--panel:#fff;--ink:#1b1f24;--mute:#5d6875;--line:#e2e6ea;--accent:#2952cc;--ok:#1f7a4d;--warn:#a15c00;--bad:#b42318;--chip:#eef1f5;font-family:ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif}
+@media (prefers-color-scheme:dark){:root{--bg:#111418;--panel:#181c21;--ink:#e6e9ed;--mute:#98a2ae;--line:#2a3038;--accent:#7b9cff;--ok:#4cc38a;--warn:#f0a948;--bad:#ff6b5e;--chip:#222830}}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font-size:14px}
+header{display:flex;align-items:center;gap:16px;padding:12px 20px;border-bottom:1px solid var(--line);background:var(--panel);position:sticky;top:0;z-index:2}
+header h1{font-size:15px;margin:0;font-weight:650;letter-spacing:.2px}
+nav{display:flex;gap:4px;flex-wrap:wrap}nav button{border:0;background:none;color:var(--mute);padding:6px 10px;border-radius:6px;cursor:pointer;font:inherit}
+nav button.on{background:var(--chip);color:var(--ink);font-weight:600}
+.sp{flex:1}input,select,textarea{font:inherit;color:var(--ink);background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:6px 8px}
+main{padding:20px;max-width:1200px;margin:0 auto}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:12px}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:14px}
+.k{color:var(--mute);font-size:12px}.v{font-size:24px;font-weight:650;margin-top:4px;font-variant-numeric:tabular-nums}
+h2{font-size:14px;margin:22px 0 10px}table{width:100%;border-collapse:collapse;background:var(--panel);border:1px solid var(--line);border-radius:10px;overflow:hidden}
+th,td{text-align:left;padding:8px 10px;border-bottom:1px solid var(--line);vertical-align:top;font-size:13px}th{color:var(--mute);font-weight:600;font-size:12px}
+tr:last-child td{border-bottom:0}code,.mono{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12px}
+.chip{display:inline-block;padding:1px 7px;border-radius:99px;background:var(--chip);font-size:12px;margin:1px 2px 1px 0}
+.ok{color:var(--ok)}.bad{color:var(--bad)}.warn{color:var(--warn)}
+button.act{border:1px solid var(--line);background:var(--panel);color:var(--ink);padding:5px 10px;border-radius:6px;cursor:pointer;font:inherit}
+button.pri{background:var(--accent);border-color:var(--accent);color:#fff}button.dang{color:var(--bad)}
+.row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}.cols{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+@media (max-width:700px){.cols{grid-template-columns:1fr}main{padding:12px}}
+pre{white-space:pre-wrap;word-break:break-word;margin:0}.muted{color:var(--mute)}#msg{font-size:12px}
+.gate{font-size:12px}.gate b{font-weight:600}
+</style>
+</head>
+<body>
+<header>
+  <h1>Agentic CDP</h1>
+  <nav id="nav"></nav><span class="sp"></span>
+  <span id="msg" class="muted"></span>
+  <input id="key" type="password" placeholder="API key" style="width:180px">
+</header>
+<main id="view"></main>
+<script>
+const TABS=["Overview","Review","Profiles","Sources","Audit","Privacy"];let tab="Overview";
+const $=s=>document.querySelector(s);const esc=s=>String(s??"").replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+try{$("#key").value=localStorage.getItem("acdp_key")||""}catch(e){}
+$("#key").onchange=()=>{try{localStorage.setItem("acdp_key",$("#key").value)}catch(e){};render()};
+async function api(path,opt={}){const r=await fetch(path,{...opt,headers:{"content-type":"application/json","x-api-key":$("#key").value,...(opt.headers||{})}});
+ const t=await r.text();let j;try{j=JSON.parse(t)}catch{j=t}if(!r.ok)throw new Error((j&&j.detail)||r.status);return j}
+function msg(t,cls="muted"){const m=$("#msg");m.className=cls;m.textContent=t}
+function nav(){$("#nav").innerHTML=TABS.map(t=>`<button class="${t===tab?"on":""}" onclick="tab='${t}';render()">${t}</button>`).join("")}
+async function render(){nav();const v=$("#view");v.innerHTML='<p class="muted">Loading…</p>';try{await VIEWS[tab](v)}catch(e){v.innerHTML=`<div class="card bad">${esc(e.message)}</div>`}}
+const fmtName=d=>esc([d.first_name,d.last_name,d.name_suffix&&d.name_suffix[0].toUpperCase()+d.name_suffix.slice(1)].filter(Boolean).join(" ")||"(no name)");
+const gatesHtml=g=>(g||[]).map(x=>`<div class="gate"><b class="${x.passed?"ok":(x.severity==="hard"?"bad":"warn")}">${x.passed?"✓":"✗"} ${esc(x.gate)}</b> ${x.passed?"":esc(x.detail)}</div>`).join("");
+const VIEWS={
+async Overview(v){const s=await api("/stats");const h=await api("/health");
+ const q=Object.entries(s.review_queue).map(([k,n])=>`<span class="chip">${esc(k)}: ${n}</span>`).join("")||'<span class="muted">empty</span>';
+ v.innerHTML=`<div class="grid">${[["Sources",s.sources],["Active records",s.records],["Golden profiles",s.profiles],["Ledger events",s.ledger_events]].map(([k,n])=>`<div class="card"><div class="k">${k}</div><div class="v">${n}</div></div>`).join("")}
+ <div class="card"><div class="k">Ledger chain</div><div class="v ${h.ok?"ok":"bad"}">${h.ok?"Intact":"BROKEN"}</div></div></div>
+ <h2>Review queue</h2><div class="card">${q}</div>
+ <div class="row" style="margin-top:14px"><button class="act pri" onclick="runNow(false)">Run pipeline</button><button class="act" onclick="runNow(true)">Force run (admin)</button><span class="muted">Agent: <code>${esc(h.agent)}</code></span></div>
+ <h2>Recent runs</h2><table><tr><th>#</th><th>Status</th><th>Started</th><th>Profiles</th><th>Agent calls</th><th>Breakers / changes</th></tr>
+ ${s.runs.map(r=>`<tr><td>${r.id}</td><td class="${r.status==="published"?"ok":r.status==="halted"?"warn":"bad"}">${r.status}</td><td class="mono">${esc(r.started_at)}</td><td>${r.stats.clusters??""}</td><td>${r.stats.agent_calls??""}</td><td>${(r.stats.breakers||[]).map(b=>`<div class="warn">${esc(b)}</div>`).join("")}${["merges","splits","profiles_created"].filter(k=>r.stats[k]).map(k=>`<span class="chip">${k} ${r.stats[k]}</span>`).join("")}</td></tr>`).join("")}</table>
+ <h2>Agent proposals by outcome</h2><table><tr><th>Agent</th><th>Outcome</th><th>Count</th></tr>${s.agent_outcomes.map(o=>`<tr><td class="mono">${esc(o.agent)}</td><td>${esc(o.outcome)}</td><td>${o.n}</td></tr>`).join("")}</table>`},
+async Review(v){const items=await api("/review");if(!items.length){v.innerHTML='<div class="card">Nothing needs a human. The gates handled everything.</div>';return}
+ v.innerHTML=items.map(p=>`<div class="card" style="margin-bottom:12px"><div class="row"><span class="chip">${esc(p.kind)}</span><span class="mono muted">#${p.id} · ${esc(p.agent)}</span></div>
+ ${p.records?`<div class="cols" style="margin-top:10px">${p.records.map(r=>`<div><div class="k">${esc(r.source)} · <span class="mono">${esc(r.id)}</span></div><b>${fmtName(r.data)}</b><div class="mono">${esc((r.data.emails||[]).join(", "))}<br>${esc((r.data.phones||[]).join(", "))}<br>${esc(r.data.birth_date||"")} ${esc(Object.values(r.data.address||{}).join(", "))}</div></div>`).join("")}</div>`:""}
+ ${p.comparisons?`<div style="margin-top:8px">${Object.entries(p.comparisons).map(([f,c])=>`<span class="chip">${f}: ${c.status}</span>`).join("")}</div>`:""}
+ ${p.output&&p.output.rationale?`<p><b>Agent:</b> ${esc(p.output.decision)} (${esc(p.output.confidence)}) — ${esc(p.output.rationale)}</p>`:""}
+ ${p.kind==="schema_mapping"?`<pre class="mono">${esc(JSON.stringify(p.output.fields||p.output,null,1))}</pre>`:""}
+ <div style="margin:8px 0">${gatesHtml(p.gates)}</div>
+ <div class="row"><input id="n${p.id}" placeholder="note (recorded in ledger as digest)" style="flex:1"><button class="act pri" onclick="decide(${p.id},true)">${p.kind==="schema_mapping"?"Approve mapping":"Same person"}</button><button class="act dang" onclick="decide(${p.id},false)">${p.kind==="schema_mapping"?"Reject":"Different people"}</button></div></div>`).join("")},
+async Profiles(v){v.innerHTML=`<div class="row"><input id="pq" placeholder="Search name, email, id…" style="flex:1"><button class="act" onclick="loadProfiles()">Search</button></div><div id="plist" style="margin-top:12px"></div><div id="pdetail"></div>`;$("#pq").onkeydown=e=>{if(e.key==="Enter")loadProfiles()};loadProfiles()},
+async Sources(v){const s=await api("/sources");v.innerHTML=`<table><tr><th>Source</th><th>Kind</th><th>Trust</th><th>Cursor</th><th>Active mapping</th><th></th></tr>${s.map(x=>`<tr><td><b>${esc(x.id)}</b></td><td>${esc(x.kind)}</td><td>${x.trust_rank}</td><td class="mono">${esc(x.cursor||"")}</td><td>${x.mapping?`v${x.mapping.version}: `+Object.entries(x.mapping.fields).map(([k,f])=>`<span class="chip mono">${esc(k)}→${esc(f.target)}</span>`).join(""):'<span class="warn">none — ingest blocked</span>'}</td><td><button class="act" onclick="ingest('${esc(x.id)}')">Ingest</button></td></tr>`).join("")}</table>`},
+async Audit(v){const [ver,ev]=await Promise.all([api("/audit/verify"),api("/audit/events?limit=200")]);
+ v.innerHTML=`<div class="row"><div class="card"><div class="k">Chain</div><div class="v ${ver.ok?"ok":"bad"}">${ver.ok?"Intact":"BROKEN"}</div><div class="mono muted">${ver.events} events · head ${esc((ver.head||ver.error||"").slice(0,16))}</div></div><button class="act" onclick="replay()">Hermetic replay</button><span id="rp"></span></div>
+ <h2>Events</h2><table><tr><th>#</th><th>Type</th><th>Actor</th><th>Payload</th></tr>${ev.reverse().map(e=>`<tr><td>${e.seq}</td><td><span class="chip">${esc(e.type)}</span></td><td class="mono">${esc(e.actor)}</td><td class="mono"><pre>${esc(JSON.stringify(e.payload))}</pre></td></tr>`).join("")}</table>`},
+async Privacy(v){v.innerHTML=`<div class="card"><h2 style="margin-top:0">Right to erasure</h2><p class="muted">Deletes PII from raw, canonical and golden layers, keeps a hash-only ledger entry, and suppresses re-ingestion.</p>
+ <div class="row"><input id="ee" placeholder="email"><input id="ep" placeholder="phone"><input id="eid" placeholder="profile id"><input id="er" placeholder="reason / ticket #"><button class="act dang" onclick="erase()">Erase</button></div></div>
+ <div class="card" style="margin-top:12px"><h2 style="margin-top:0">Consent-gated export</h2><div class="row"><select id="purpose"><option>email_marketing</option><option>sms_marketing</option><option>analytics</option></select><button class="act" onclick="exp()">Preview export</button></div><div id="expout"></div></div>`}};
+async function loadProfiles(){const q=$("#pq").value;const r=await api("/profiles?limit=100"+(q?"&q="+encodeURIComponent(q):""));
+ $("#plist").innerHTML=`<div class="muted">${r.total} profiles</div><table><tr><th>Profile</th><th>Name</th><th>Email</th><th>Sources</th><th>Records</th><th>Consent</th></tr>${r.items.map(p=>`<tr style="cursor:pointer" onclick="showProfile('${p.id}')"><td class="mono">${p.id}</td><td>${fmtName(p.data)}</td><td class="mono">${esc(p.data.primary_email||"")}</td><td>${(p.data.sources||[]).map(s=>`<span class="chip">${esc(s)}</span>`).join("")}</td><td>${p.members}</td><td>${Object.entries(p.consent||{}).map(([k,c])=>`<span class="chip ${c.granted?"ok":"bad"}">${k}</span>`).join("")}</td></tr>`).join("")}</table>`}
+async function showProfile(id){const p=await api("/profiles/"+id);$("#pdetail").innerHTML=`<h2>${fmtName(p.data)} <span class="mono muted">${p.id}</span></h2><div class="cols"><div class="card"><div class="k">Golden record & lineage</div><table>${Object.entries(p.data).filter(([k])=>k!=="sources").map(([k,v])=>`<tr><td class="k">${k}</td><td class="mono">${esc(typeof v==="object"?JSON.stringify(v):v)}</td><td class="muted">${p.lineage[k]?esc(p.lineage[k].source+" · "+p.lineage[k].rule):""}</td></tr>`).join("")}</table></div>
+ <div class="card"><div class="k">Member records (${p.records.length}) — select to split off</div>${p.records.map(r=>`<label style="display:block;margin:6px 0"><input type="checkbox" value="${esc(r.id)}" class="splitck"> <b>${esc(r.source)}</b> <span class="mono">${esc(r.id)}</span><div class="mono muted">${fmtName(r.data)} · ${esc((r.data.emails||[]).join(","))} · ${esc(r.observed_at)}</div></label>`).join("")}<button class="act" onclick="split('${p.id}')">Split selected</button></div></div>`}
+async function decide(id,ok){try{await api("/review/"+id,{method:"POST",body:JSON.stringify({approve:ok,note:$("#n"+id).value})});msg("Recorded. Takes effect on next run.","ok");render()}catch(e){msg(e.message,"bad")}}
+async function runNow(force){msg("Running…");try{const r=await api("/runs",{method:"POST",body:JSON.stringify({force})});msg("Run "+r.resolve.run+": "+r.resolve.status,r.resolve.status==="published"?"ok":"warn");render()}catch(e){msg(e.message,"bad")}}
+async function ingest(id){try{const r=await api(`/sources/${id}/ingest`,{method:"POST"});msg(id+": "+r.status,"ok")}catch(e){msg(e.message,"bad")}}
+async function replay(){const r=await api("/audit/replay");$("#rp").innerHTML=`<span class="${r.ok?"ok":"bad"}">${r.ok?"Replay matches published state":"Replay MISMATCH"}</span> <span class="mono muted">${r.replayed_digest.slice(0,16)}</span>`}
+async function split(pid){const ids=[...document.querySelectorAll(".splitck:checked")].map(x=>x.value);if(!ids.length)return;await api(`/profiles/${pid}/split`,{method:"POST",body:JSON.stringify({record_ids:ids,reason:"console split"})});msg("Split constraints recorded; run the pipeline to apply.","ok")}
+async function erase(){try{const r=await api("/privacy/erasure",{method:"POST",body:JSON.stringify({email:$("#ee").value||null,phone:$("#ep").value||null,profile_id:$("#eid").value||null,reason:$("#er").value||"unspecified"})});msg(`Erased ${r.erased_records} records`,"ok")}catch(e){msg(e.message,"bad")}}
+async function exp(){const r=await api("/export/"+$("#purpose").value+"?limit=50");$("#expout").innerHTML=`<p class="muted">${r.length} shown (consented only)</p><pre class="mono">${esc(JSON.stringify(r.slice(0,10),null,1))}</pre>`}
+render();
+</script>
+</body>
+</html>
