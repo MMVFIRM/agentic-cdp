@@ -1,0 +1,18 @@
+{
+  "_comment": "Pre-registered before the first benchmark run (2026-09-29). Thresholds are not tuned after seeing results; if a gate fails, the method changes or the failure is published.",
+  "G1_pairwise_precision_min": 0.98,
+  "G2_pairwise_recall_min": 0.90,
+  "G3_distinguishable_hard_negative_merges_max": 0,
+  "G4_replay_digest_match": true,
+  "G5_ledger_intact_and_tamper_detected": true,
+  "G6_mapping_identity_accuracy_min": 1.0,
+  "G7_erasure_residual_pii_max": 0,
+  "G7_erasure_reingest_suppressed": true,
+  "G8_consent_violation_rate_max": 0.005,
+  "G9_profile_id_stability_min": 0.99,
+  "G10_negative_controls_must_fail": true,
+  "G11_adversarial_agent_precision_min": 0.98,
+  "G11_adversarial_fabrications_applied_max": 0,
+  "G12_review_queue_per_record_max": 0.05,
+  "G13_circuit_breaker_halts_catastrophic_merge": true
+}
